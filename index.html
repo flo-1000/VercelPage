@@ -47,109 +47,133 @@
 <button onclick="submitVotes()">Submit Votes</button>
 
 <script>
-const supabase = supabase.createClient(
+  // --------------------------
+  // Initialize Supabase client
+  // --------------------------
+  var supabaseClient = supabase.createClient(
   "https://tnsnitlecyoazswfluzo.supabase.co",
 "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc25pdGxlY3lvYXpzd2ZsdXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTE2NTcsImV4cCI6MjA4NzI4NzY1N30.xarvcLJ0wfUWQ2-oGbv7c-qzfnjYSVzKvMrrjKf1XIw"
 );
 
-let persons = [];
-let questions = [];
-let selectedVotes = {};
+  var persons = [];
+  var questions = [];
+  var selectedVotes = {};
 
-async function loadData() {
-  const { data: personsData } = await supabase.from("persons").select("*");
-  persons = personsData;
+  // --------------------------
+  // Load persons & questions
+  // --------------------------
+  async function loadData() {
+    const { data: personsData, error: err1 } = await supabaseClient.from("persons").select("*");
+    if (err1) { console.error(err1); return; }
+    persons = personsData;
 
-  const nameList = document.getElementById("names");
-  persons.forEach(p => {
-    const option = document.createElement("option");
-    option.value = p.name;
-    nameList.appendChild(option);
-  });
-
-  const { data: questionData } = await supabase.from("questions").select("*");
-  questions = questionData;
-
-  const container = document.getElementById("questionsContainer");
-
-  questions.forEach(q => {
-    const div = document.createElement("div");
-    div.className = "question";
-
-    div.innerHTML = `
-      <label>${q.question_text}</label>
-      <input list="names" id="q_${q.id}" oninput="validateInput(this, '${q.id}')">
-      <span id="status_${q.id}"></span>
-    `;
-
-    container.appendChild(div);
-  });
-}
-
-function validateInput(input, questionId) {
-  const name = input.value.trim();
-  const person = persons.find(p => p.name === name);
-  const status = document.getElementById("status_" + questionId);
-
-  if (person) {
-    status.innerHTML = "✔";
-    status.className = "valid";
-    selectedVotes[questionId] = person.id;
-  } else {
-    status.innerHTML = "✖";
-    status.className = "invalid";
-    delete selectedVotes[questionId];
-  }
-}
-
-document.getElementById("voterInput").addEventListener("input", function() {
-  const name = this.value.trim();
-  const person = persons.find(p => p.name === name);
-  const status = document.getElementById("voterStatus");
-
-  if (person) {
-    status.innerHTML = "✔";
-    status.className = "valid";
-  } else {
-    status.innerHTML = "✖";
-    status.className = "invalid";
-  }
-});
-
-async function submitVotes() {
-  const voterName = document.getElementById("voterInput").value.trim();
-  const voter = persons.find(p => p.name === voterName);
-
-  if (!voter) {
-    alert("Invalid voter name");
-    return;
-  }
-
-  if (Object.keys(selectedVotes).length !== questions.length) {
-    alert("Answer all questions");
-    return;
-  }
-
-  for (let q of questions) {
-    const targetId = selectedVotes[q.id];
-
-    const { error } = await supabase.from("votes").insert({
-      voter_id: voter.id,
-      target_id: targetId,
-      question_id: q.id
+    const nameList = document.getElementById("names");
+    persons.forEach(p => {
+      const option = document.createElement("option");
+      option.value = p.name;
+      nameList.appendChild(option);
     });
 
-    if (error) {
-      alert("You already voted.");
+    const { data: questionData, error: err2 } = await supabaseClient.from("questions").select("*");
+    if (err2) { console.error(err2); return; }
+    questions = questionData;
+
+    const container = document.getElementById("questionsContainer");
+    container.innerHTML = "";
+
+    questions.forEach(q => {
+      const div = document.createElement("div");
+      div.className = "question";
+      div.innerHTML = `
+        <label>${q.question_text}</label>
+        <input list="names" id="q_${q.id}" oninput="validateInput(this, '${q.id}')">
+        <span id="status_${q.id}"></span>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  // --------------------------
+  // Input validation
+  // --------------------------
+  window.validateInput = function(input, questionId) {
+    const name = input.value.trim();
+    const person = persons.find(p => p.name === name);
+    const status = document.getElementById("status_" + questionId);
+
+    if (person) {
+      status.innerHTML = "✔";
+      status.className = "valid";
+      selectedVotes[questionId] = person.id;
+    } else {
+      status.innerHTML = "✖";
+      status.className = "invalid";
+      delete selectedVotes[questionId];
+    }
+  }
+
+  document.getElementById("voterInput").addEventListener("input", function() {
+    const name = this.value.trim();
+    const person = persons.find(p => p.name === name);
+    const status = document.getElementById("voterStatus");
+
+    if (person) {
+      status.innerHTML = "✔";
+      status.className = "valid";
+    } else {
+      status.innerHTML = "✖";
+      status.className = "invalid";
+    }
+  });
+
+  // --------------------------
+  // Submit votes
+  // --------------------------
+  window.submitVotes = async function() {
+    const voterName = document.getElementById("voterInput").value.trim();
+    const voter = persons.find(p => p.name === voterName);
+
+    if (!voter) {
+      alert("Invalid voter name");
       return;
     }
 
-    await supabase.rpc("increment_vote", { person_id: targetId });
+    if (Object.keys(selectedVotes).length !== questions.length) {
+      alert("Answer all questions");
+      return;
+    }
+
+    for (let q of questions) {
+      const targetId = selectedVotes[q.id];
+
+      // Insert vote
+      const { error } = await supabaseClient.from("votes").insert({
+        voter_id: voter.id,
+        target_id: targetId,
+        question_id: q.id
+      });
+
+      if (error) {
+        alert("You already voted for one of the questions or another error occurred.");
+        console.error(error);
+        return;
+      }
+
+      // Increment vote count
+      const { error: rpcError } = await supabaseClient.rpc("increment_vote", { person_id: targetId });
+      if (rpcError) {
+        console.error(rpcError);
+      }
+    }
+
+    alert("Votes submitted successfully!");
+    selectedVotes = {};
+    document.getElementById("voterInput").value = "";
+    document.getElementById("voterStatus").innerHTML = "";
+    loadData(); // reload questions in case you want fresh inputs
   }
 
-  alert("Votes submitted!");
-}
-loadData();
+  loadData();
 </script>
 
 </body>
