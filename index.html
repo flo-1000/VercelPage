@@ -2,9 +2,155 @@
 <html>
 <head>
   <title>Voting App</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body {
+      font-family: Arial;
+      max-width: 700px;
+      margin: 40px auto;
+    }
+
+    input {
+      padding: 8px;
+      width: 100%;
+      margin-bottom: 5px;
+    }
+
+    .valid { color: green; }
+    .invalid { color: red; }
+
+    .question {
+      margin-top: 30px;
+      padding: 15px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px;
+      width: 100%;
+    }
+  </style>
 </head>
 <body>
-  <h1>Voting App is Live 🚀</h1>
-  <p>If you see this, deployment works.</p>
+
+<h2>Voting App</h2>
+
+<label>Your Name:</label>
+<input id="voterInput" list="names">
+<span id="voterStatus"></span>
+
+<datalist id="names"></datalist>
+
+<div id="questionsContainer"></div>
+
+<button onclick="submitVotes()">Submit Votes</button>
+
+<script>
+const supabase = supabase.createClient(
+  "https://tnsnitlecyoazswfluzo.supabase.co",
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc25pdGxlY3lvYXpzd2ZsdXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTE2NTcsImV4cCI6MjA4NzI4NzY1N30.xarvcLJ0wfUWQ2-oGbv7c-qzfnjYSVzKvMrrjKf1XIw"
+);
+
+let persons = [];
+let questions = [];
+let selectedVotes = {};
+
+async function loadData() {
+  const { data: personsData } = await supabase.from("persons").select("*");
+  persons = personsData;
+
+  const nameList = document.getElementById("names");
+  persons.forEach(p => {
+    const option = document.createElement("option");
+    option.value = p.name;
+    nameList.appendChild(option);
+  });
+
+  const { data: questionData } = await supabase.from("questions").select("*");
+  questions = questionData;
+
+  const container = document.getElementById("questionsContainer");
+
+  questions.forEach(q => {
+    const div = document.createElement("div");
+    div.className = "question";
+
+    div.innerHTML = `
+      <label>${q.question_text}</label>
+      <input list="names" id="q_${q.id}" oninput="validateInput(this, '${q.id}')">
+      <span id="status_${q.id}"></span>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+function validateInput(input, questionId) {
+  const name = input.value.trim();
+  const person = persons.find(p => p.name === name);
+  const status = document.getElementById("status_" + questionId);
+
+  if (person) {
+    status.innerHTML = "✔";
+    status.className = "valid";
+    selectedVotes[questionId] = person.id;
+  } else {
+    status.innerHTML = "✖";
+    status.className = "invalid";
+    delete selectedVotes[questionId];
+  }
+}
+
+document.getElementById("voterInput").addEventListener("input", function() {
+  const name = this.value.trim();
+  const person = persons.find(p => p.name === name);
+  const status = document.getElementById("voterStatus");
+
+  if (person) {
+    status.innerHTML = "✔";
+    status.className = "valid";
+  } else {
+    status.innerHTML = "✖";
+    status.className = "invalid";
+  }
+});
+
+async function submitVotes() {
+  const voterName = document.getElementById("voterInput").value.trim();
+  const voter = persons.find(p => p.name === voterName);
+
+  if (!voter) {
+    alert("Invalid voter name");
+    return;
+  }
+
+  if (Object.keys(selectedVotes).length !== questions.length) {
+    alert("Answer all questions");
+    return;
+  }
+
+  for (let q of questions) {
+    const targetId = selectedVotes[q.id];
+
+    const { error } = await supabase.from("votes").insert({
+      voter_id: voter.id,
+      target_id: targetId,
+      question_id: q.id
+    });
+
+    if (error) {
+      alert("You already voted.");
+      return;
+    }
+
+    await supabase.rpc("increment_vote", { person_id: targetId });
+  }
+
+  alert("Votes submitted!");
+}
+loadData();
+</script>
+
 </body>
 </html>
