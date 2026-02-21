@@ -1,169 +1,364 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Voting App</title>
+  <title>Schüler-Abstimmung</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <style>
-    body {
-      font-family: Arial;
-      max-width: 700px;
-      margin: 40px auto;
+
+<style>
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 520px;
+    background: rgba(255,255,255,0.97);
+    border-radius: 22px;
+    padding: 22px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.18);
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h2 {
+    text-align: center;
+    margin: 0 0 20px 0;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+
+  label {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #444;
+  }
+
+  .field {
+    position: relative;
+    margin-bottom: 14px;
+  }
+
+  #voterInput {
+    max-width: 280px;
+  }
+
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid #e2e2e2;
+    font-size: 15px;
+    transition: all 0.2s ease;
+  }
+
+  input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+  }
+
+  .suggestions {
+    position: absolute;
+    width: 100%;
+    background: white;
+    border-radius: 12px;
+    margin-top: 6px;
+    max-height: 160px;
+    overflow-y: auto;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    z-index: 1000;
+  }
+
+  .suggestion-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s;
+  }
+
+  .suggestion-item:hover {
+    background: #f3f4ff;
+  }
+
+  .question {
+    background: #f7f8ff;
+    padding: 14px 16px;
+    border-radius: 16px;
+    margin-bottom: 16px;
+    transition: transform 0.15s ease;
+  }
+
+  .question:hover {
+    transform: translateY(-1px);
+  }
+
+  button {
+    width: 100%;
+    padding: 14px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.15);
+  }
+
+  .valid {
+    color: #22c55e;
+    font-size: 13px;
+    margin-left: 6px;
+  }
+
+  .invalid {
+    color: #ef4444;
+    font-size: 13px;
+    margin-left: 6px;
+  }
+
+  /* Mobile fine tuning */
+  @media (max-width: 480px) {
+    .app {
+      padding: 18px;
+      border-radius: 18px;
     }
 
-    input {
-      padding: 8px;
-      width: 100%;
-      margin-bottom: 5px;
+    h2 {
+      font-size: 20px;
     }
 
-    .valid { color: green; }
-    .invalid { color: red; }
-
-    .question {
-      margin-top: 30px;
-      padding: 15px;
-      border: 1px solid #ccc;
+    #voterInput {
+      max-width: 100%;
     }
-
-    button {
-      margin-top: 15px;
-      padding: 10px;
-      width: 100%;
-    }
-  </style>
+  }
+</style>
 </head>
+
 <body>
 
-<h2>Voting App</h2>
+<div class="app">
+  <h2>Schüler-Abstimmung</h2>
 
-<label>Your Name:</label>
-<input id="voterInput" list="names">
-<span id="voterStatus"></span>
+  <div class="field">
+    <label>Dein Name</label>
+    <input id="voterInput" autocomplete="off">
+    <div id="voterSuggestions" class="suggestions"></div>
+    <span id="voterStatus"></span>
+  </div>
 
-<datalist id="names"></datalist>
+  <div id="questionsContainer"></div>
 
-<div id="questionsContainer"></div>
-
-<button onclick="submitVotes()">Submit Votes</button>
+  <button onclick="submitVotes()">Stimmen Abgeben</button>
+</div>
 
 <script>
-    var supabaseClient = supabase.createClient(
+
+var supabaseClient = supabase.createClient(
   "https://tnsnitlecyoazswfluzo.supabase.co",
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc25pdGxlY3lvYXpzd2ZsdXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTE2NTcsImV4cCI6MjA4NzI4NzY1N30.xarvcLJ0wfUWQ2-oGbv7c-qzfnjYSVzKvMrrjKf1XIw"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc25pdGxlY3lvYXpzd2ZsdXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTE2NTcsImV4cCI6MjA4NzI4NzY1N30.xarvcLJ0wfUWQ2-oGbv7c-qzfnjYSVzKvMrrjKf1XIw"
 );
 
-  var persons = [];
-  var questions = [];
-  var selectedVotes = {};
+let persons = [];
+let questions = [];
+let selectedVotes = {};
+let selectedVoter = null;
 
-  async function loadPersons() {
-    const { data, error } = await supabaseClient.from("persons").select("*");
-    if (error) { console.error(error); return; }
-    persons = data;
+async function loadPersons() {
+  const { data, error } = await supabaseClient
+    .from("persons")
+    .select("*")
+    .order("name");
 
-    const nameList = document.getElementById("names");
-    nameList.innerHTML = ""; // clear any previous options just in case
-    persons.forEach(p => {
-      const option = document.createElement("option");
-      option.value = p.name;
-      nameList.appendChild(option);
-    });
+  if (error) {
+    console.error(error);
+    return;
   }
 
-  async function loadQuestions() {
-    const { data, error } = await supabaseClient.from("questions").select("*");
-    if (error) { console.error(error); return; }
-    questions = data;
+  persons = data;
+}
 
-    const container = document.getElementById("questionsContainer");
-    container.innerHTML = "";
+async function loadQuestions() {
+  const { data, error } = await supabaseClient
+    .from("questions")
+    .select("*");
 
-    questions.forEach(q => {
-      const div = document.createElement("div");
-      div.className = "question";
-      div.innerHTML = `
-        <label>${q.question_text}</label>
-        <input list="names" id="q_${q.id}" oninput="validateInput(this, '${q.id}')">
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  questions = data;
+
+  const container = document.getElementById("questionsContainer");
+  container.innerHTML = "";
+
+  questions.forEach(q => {
+    const div = document.createElement("div");
+    div.className = "question";
+    div.innerHTML = `
+      <label>${q.question_text}</label>
+      <div class="field">
+        <input id="q_${q.id}" autocomplete="off">
+        <div id="suggestions_${q.id}" class="suggestions"></div>
         <span id="status_${q.id}"></span>
-      `;
-      container.appendChild(div);
-    });
-  }
+      </div>
+    `;
+    container.appendChild(div);
 
+    setupAutocomplete(`q_${q.id}`, `suggestions_${q.id}`, `status_${q.id}`, q.id);
+  });
+}
 
-  window.validateInput = function(input, questionId) {
-    const name = input.value.trim();
-    const person = persons.find(p => p.name === name);
-    const status = document.getElementById("status_" + questionId);
+function setupAutocomplete(inputId, suggestionId, statusId, questionId=null) {
 
-    if (person) {
-      status.innerHTML = "✔";
-      status.className = "valid";
-      selectedVotes[questionId] = person.id;
-    } else {
-      status.innerHTML = "✖";
-      status.className = "invalid";
+  const input = document.getElementById(inputId);
+  const box = document.getElementById(suggestionId);
+  const status = document.getElementById(statusId);
+
+  input.addEventListener("input", function() {
+
+    const value = this.value.trim().toLowerCase();
+    box.innerHTML = "";
+
+    const exactMatch = persons.find(p => p.name.toLowerCase() === value);
+
+    if (!exactMatch && questionId) {
       delete selectedVotes[questionId];
     }
-  }
 
-  document.getElementById("voterInput").addEventListener("input", function() {
-    const name = this.value.trim();
-    const person = persons.find(p => p.name === name);
-    const status = document.getElementById("voterStatus");
+    if (!value) {
+      status.innerHTML = "";
+      return;
+    }
 
-    if (person) {
+    if (exactMatch) {
       status.innerHTML = "✔";
       status.className = "valid";
+
+      if (questionId) selectedVotes[questionId] = exactMatch.id;
+      else selectedVoter = exactMatch;
+
     } else {
       status.innerHTML = "✖";
       status.className = "invalid";
+      if (!questionId) selectedVoter = null;
     }
+
+    const matches = persons.filter(p =>
+      p.name.toLowerCase().includes(value)
+    );
+
+    matches.forEach(person => {
+      const div = document.createElement("div");
+      div.className = "suggestion-item";
+      div.textContent = person.name;
+
+      div.onclick = () => {
+        input.value = person.name;
+        box.innerHTML = "";
+
+        status.innerHTML = "✔";
+        status.className = "valid";
+
+        if (questionId)
+          selectedVotes[questionId] = person.id;
+        else
+          selectedVoter = person;
+      };
+
+      box.appendChild(div);
+    });
   });
 
-  window.submitVotes = async function() {
-    const voterName = document.getElementById("voterInput").value.trim();
-    const voter = persons.find(p => p.name === voterName);
-
-    if (!voter) {
-      alert("Invalid voter name");
-      return;
+  document.addEventListener("click", function(e) {
+    if (!input.contains(e.target) && !box.contains(e.target)) {
+      box.innerHTML = "";
     }
+  });
+}
 
-    if (Object.keys(selectedVotes).length !== questions.length) {
-      alert("Answer all questions");
-      return;
-    }
+setupAutocomplete("voterInput", "voterSuggestions", "voterStatus");
 
-    for (let q of questions) {
-      const targetId = selectedVotes[q.id];
+async function submitVotes() {
 
-      const { error } = await supabaseClient.from("votes").insert({
-        voter_id: voter.id,
+  if (!selectedVoter) {
+    alert("Bitte gültigen Namen wählen.");
+    return;
+  }
+
+  if (Object.keys(selectedVotes).length !== questions.length) {
+    alert("Bitte alle Fragen beantworten.");
+    return;
+  }
+
+  let hasError = false;
+
+  for (let q of questions) {
+
+    const targetId = selectedVotes[q.id];
+
+    const { error } = await supabaseClient
+      .from("votes")
+      .insert({
+        voter_id: selectedVoter.id,
         target_id: targetId,
         question_id: q.id
       });
 
-      if (error) {
-        alert("You already voted for one of the questions or another error occurred.");
-        console.error(error);
-        return;
-      }
-
-      const { error: rpcError } = await supabaseClient.rpc("increment_vote", { person_id: targetId });
-      if (rpcError) {
-        console.error(rpcError);
-      }
+    if (error) {
+      console.error(error);
+      hasError = true;
+      break;
     }
 
-    alert("Votes submitted successfully!");
-    selectedVotes = {};
-    document.getElementById("voterInput").value = "";
-    document.getElementById("voterStatus").innerHTML = "";
-    loadQuestions();  }
+    const { error: rpcError } = await supabaseClient
+      .rpc("increment_vote", { person_id: targetId });
 
-  loadPersons();
-  loadQuestions();
+    if (rpcError) {
+      console.error(rpcError);
+      hasError = true;
+      break;
+    }
+  }
+
+  if (hasError) {
+    alert("Fehler beim Abstimmen oder bereits abgestimmt.");
+    return;
+  }
+
+  alert("Stimmen erfolgreich abgegeben!");
+  location.reload();
+}
+
+
+async function init() {
+  await loadPersons();
+  await loadQuestions();
+}
+
+init();
+
 </script>
 
 </body>
