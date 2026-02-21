@@ -47,10 +47,7 @@
 <button onclick="submitVotes()">Submit Votes</button>
 
 <script>
-  // --------------------------
-  // Initialize Supabase client
-  // --------------------------
-  var supabaseClient = supabase.createClient(
+    var supabaseClient = supabase.createClient(
   "https://tnsnitlecyoazswfluzo.supabase.co",
 "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc25pdGxlY3lvYXpzd2ZsdXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTE2NTcsImV4cCI6MjA4NzI4NzY1N30.xarvcLJ0wfUWQ2-oGbv7c-qzfnjYSVzKvMrrjKf1XIw"
 );
@@ -59,24 +56,24 @@
   var questions = [];
   var selectedVotes = {};
 
-  // --------------------------
-  // Load persons & questions
-  // --------------------------
-  async function loadData() {
-    const { data: personsData, error: err1 } = await supabaseClient.from("persons").select("*");
-    if (err1) { console.error(err1); return; }
-    persons = personsData;
+  async function loadPersons() {
+    const { data, error } = await supabaseClient.from("persons").select("*");
+    if (error) { console.error(error); return; }
+    persons = data;
 
     const nameList = document.getElementById("names");
+    nameList.innerHTML = ""; // clear any previous options just in case
     persons.forEach(p => {
       const option = document.createElement("option");
       option.value = p.name;
       nameList.appendChild(option);
     });
+  }
 
-    const { data: questionData, error: err2 } = await supabaseClient.from("questions").select("*");
-    if (err2) { console.error(err2); return; }
-    questions = questionData;
+  async function loadQuestions() {
+    const { data, error } = await supabaseClient.from("questions").select("*");
+    if (error) { console.error(error); return; }
+    questions = data;
 
     const container = document.getElementById("questionsContainer");
     container.innerHTML = "";
@@ -93,9 +90,7 @@
     });
   }
 
-  // --------------------------
-  // Input validation
-  // --------------------------
+
   window.validateInput = function(input, questionId) {
     const name = input.value.trim();
     const person = persons.find(p => p.name === name);
@@ -126,9 +121,6 @@
     }
   });
 
-  // --------------------------
-  // Submit votes
-  // --------------------------
   window.submitVotes = async function() {
     const voterName = document.getElementById("voterInput").value.trim();
     const voter = persons.find(p => p.name === voterName);
@@ -146,7 +138,6 @@
     for (let q of questions) {
       const targetId = selectedVotes[q.id];
 
-      // Insert vote
       const { error } = await supabaseClient.from("votes").insert({
         voter_id: voter.id,
         target_id: targetId,
@@ -159,7 +150,6 @@
         return;
       }
 
-      // Increment vote count
       const { error: rpcError } = await supabaseClient.rpc("increment_vote", { person_id: targetId });
       if (rpcError) {
         console.error(rpcError);
@@ -170,10 +160,10 @@
     selectedVotes = {};
     document.getElementById("voterInput").value = "";
     document.getElementById("voterStatus").innerHTML = "";
-    loadData(); // reload questions in case you want fresh inputs
-  }
+    loadQuestions();  }
 
-  loadData();
+  loadPersons();
+  loadQuestions();
 </script>
 
 </body>
